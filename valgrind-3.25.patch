@@ -1,0 +1,110 @@
+diff --git a/Makefile.am b/Makefile.am
+index b3e5be5f4..2de56b6ee 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -15,7 +15,8 @@ TOOLS = \
+ 		none
+ 
+ EXP_TOOLS = \
+-		exp-bbv
++		exp-bbv \
++		ws
+ 
+ # Put docs last because building the HTML is slow and we want to get
+ # everything else working before we try it.
+diff --git a/configure.ac b/configure.ac
+index cb1dc69d3..7e81bfab8 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -5755,6 +5755,7 @@ AC_CONFIG_FILES([
+    exp-bbv/tests/arm-linux/Makefile
+    shared/Makefile
+    solaris/Makefile
++   ws/Makefile
+ ])
+ AC_CONFIG_FILES([coregrind/link_tool_exe_linux],
+                 [chmod +x coregrind/link_tool_exe_linux])
+diff --git a/coregrind/m_execontext.c b/coregrind/m_execontext.c
+index b00db1886..7b88e7a3c 100644
+--- a/coregrind/m_execontext.c
++++ b/coregrind/m_execontext.c
+@@ -229,14 +229,6 @@ void VG_(pp_ExeContext) ( ExeContext* ec )
+    VG_(pp_StackTrace)( VG_(get_ExeContext_epoch)(ec), ec->ips, ec->n_ips );
+ }
+ 
+-void VG_(apply_ExeContext)(
+-   void(*action)(UInt n, DiEpoch ep, Addr ip, void* opaque),
+-   void* opaque, ExeContext* ec)
+-{
+-   VG_(apply_StackTrace)(action, opaque, VG_(get_ExeContext_epoch)(ec),
+-                         ec->ips, ec->n_ips);
+-}
+-
+ void VG_(archive_ExeContext_in_range) (DiEpoch last_epoch,
+                                        Addr text_avma, SizeT length )
+ {
+@@ -611,6 +603,37 @@ ExeContext* VG_(null_ExeContext) (void)
+    return null_ExeContext;
+ }
+ 
++void VG_(apply_ExeContext)(
++        void(*action)(UInt n, DiEpoch ep, Addr ip, void* opaque),
++        void* opaque,
++        DiEpoch ep, ExeContext *ec
++     )
++{
++   Int i;
++   Int n_ips;
++
++   vg_assert(ec);
++   n_ips = ec->n_ips;
++
++   if ( ! VG_(clo_show_below_main) ) {
++      // Search (from the outer frame onwards) the appearance of "main"
++      // or the last appearance of a below main function.
++      // Then decrease n_ips so as to not call action for the below main
++      for (i = n_ips - 1; i >= 0; i--) {
++         Vg_FnNameKind kind = VG_(get_fnname_kind_from_IP)(ep, ec->ips[i]);
++         if (Vg_FnNameMain == kind || Vg_FnNameBelowMain == kind)
++            n_ips = i + 1;
++         if (Vg_FnNameMain == kind)
++            break;
++      }
++   }
++
++   for (i = 0; i < n_ips; i++)
++      // Act on the ip
++      action(i, ep, ec->ips[i], opaque);
++}
++
++
+ /*--------------------------------------------------------------------*/
+ /*--- end                                           m_execontext.c ---*/
+ /*--------------------------------------------------------------------*/
+diff --git a/dhat/dh_main.c b/dhat/dh_main.c
+index 9e6ec1c06..fab5b9efe 100644
+--- a/dhat/dh_main.c
++++ b/dhat/dh_main.c
+@@ -1616,7 +1616,8 @@ static void write_PPInfo(PPInfo* ppi, Bool is_first)
+ 
+    FP("  ,\"fs\":");
+    Bool is_first_frame = True;
+-   VG_(apply_ExeContext)(write_PPInfo_frame, &is_first_frame, ppi->ec);
++   DiEpoch ep = DiEpoch_INVALID();
++   VG_(apply_ExeContext)(write_PPInfo_frame, &is_first_frame, ep, ppi->ec);
+    FP("]\n");
+ 
+    FP("  }\n");
+diff --git a/include/pub_tool_execontext.h b/include/pub_tool_execontext.h
+index 98c29b7e8..1c3662897 100644
+--- a/include/pub_tool_execontext.h
++++ b/include/pub_tool_execontext.h
+@@ -80,7 +80,7 @@ ExeContext* VG_(record_depth_1_ExeContext)(ThreadId tid, Word first_ip_delta);
+ // --show-below-main=yes is set.
+ extern void VG_(apply_ExeContext)(
+    void(*action)(UInt n, DiEpoch ep, Addr ip, void* opaque),
+-   void* opaque, ExeContext* ec);
++   void* opaque, DiEpoch ep, ExeContext* ec);
+ 
+ // Compare two ExeContexts.  Number of callers considered depends on `res':
+ //   Vg_LowRes:  2

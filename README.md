@@ -21,30 +21,27 @@ This tool is in early development, and might not do what you may expect. Please 
 
 ## Compiling
 ### Prerequisites
-Valgrind 3.14. Other versions are untested.
+Valgrind 3.25. Other versions are untested.
 
 ### Build Process
  1. Clone this repository into your valgrind sources, such that it resides in the same directory as `lackey`. In the following, we assume the new directory is called `ws`.
- 2. some valgrind versions need a patch (to walk stack traces from ExeContext):
-   * valgrind 3.14: apply [this patch](https://bugsfiles.kde.org/attachment.cgi?id=115712)
- 3. Edit valgrind's `Makefile.am`, adding the new directory `ws` to the `TOOLS` variable
- 4. Edit `configure.ac`, adding `ws/Makefile` to the `AC_CONFIG_FILES` list
- 5. Run
+ 2. apply `valgrind-3.25.patch`, i.e., `patch -p1 < ws/valgrind-3.25.patch`
+ 3. Run
 ```
 autogen.sh
 ./configure # possibly with other parameters
-make install
+make
 ```
 It should eventually produce a binary of ws in your `lib` folder.
 
 ## Usage
 Basic usage:
 ```
-valgrind --tool=ws <executable>
+./vg-in-place --tool=ws <executable>
 ```
 This computes the working set every 100,000 cycles. To calculate, say, every 50,000 cycles:
 ```
-valgrind --tool=ws --ws-every=50000 <executable>
+./vg-in-place --tool=ws --ws-every=50000 <executable>
 ```
 
 The page size is assumed to be 4kB by default, and can be changed with `--ws-pagesize`.
