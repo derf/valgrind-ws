@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import os
 import sys
@@ -34,7 +34,7 @@ def plot_all(stats, info, args):
     else:
         figsize = (10, 5)
     fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot('111')
+    ax = fig.add_subplot()
     mid = ind[0] + (ind[-1] - ind[0]) / 2
 
     ax.plot(ind, wssi, color='r', linestyle='-.')
@@ -59,7 +59,7 @@ def plot_all(stats, info, args):
 
     # annotate sample info
     info_color = 'green'
-    for t, pkid in peaks.iteritems():
+    for t, pkid in peaks.items():
         plt.axvline(x=t, color=info_color, linestyle='dotted')
         ax.annotate('{}'.format(pkid),
                     xy=(t, 0), xycoords='data',
